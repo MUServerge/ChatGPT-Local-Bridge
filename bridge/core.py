@@ -395,4 +395,84 @@ def execute(registry: RootRegistry, tool: str, args: dict) -> dict:
             "sha256": digest.hexdigest(),
         }
 
+    if tool in {
+        "pe_info",
+        "pe_sections",
+        "va_to_offset",
+        "read_va",
+        "find_bytes",
+        "strings",
+        "disassemble",
+    }:
+        _must_exist(path, want_file=True)
+
+        from . import binary
+
+        if tool == "pe_info":
+            result = binary.pe_info(path)
+        elif tool == "pe_sections":
+            result = binary.pe_sections(path)
+        elif tool == "va_to_offset":
+            va = int(str(args.get("va", "0")), 0)
+            offset, mode = binary.va_to_offset(path, va, str(args.get("mode", "auto")))
+            result = {
+                "va": f"0x{va:08X}",
+                "offset": offset,
+                "mode": mode,
+            }
+        elif tool == "read_va":
+            va = int(str(args.get("va", "0")), 0)
+            length = int(args.get("length", 256))
+
+            if length < 1 or length > registry.max_read_bytes:
+                raise BridgeError(f"length must be 1..{registry.max_read_bytes}")
+
+            result = binary.read_va(
+                path,
+                va,
+                length,
+                str(args.get("mode", "auto")),
+            )
+        elif tool == "find_bytes":
+            limit = min(max(int(args.get("limit", 100)), 1), 1000)
+            result = binary.find_bytes(
+                path,
+                str(args.get("signature", "")),
+                limit,
+            )
+        elif tool == "strings":
+            min_length = min(max(int(args.get("min_length", 5)), 3), 128)
+            limit = min(max(int(args.get("limit", 500)), 1), 5000)
+            result = binary.strings(path, min_length, limit)
+        else:
+            va = int(str(args.get("va", "0")), 0)
+            length = int(args.get("length", 512))
+            max_instructions = min(
+                max(int(args.get("max_instructions", 80)), 1),
+                500,
+            )
+
+            if length < 1 or length > registry.max_read_bytes:
+                raise BridgeError(f"length must be 1..{registry.max_read_bytes}")
+
+            result = binary.disassemble(
+                path,
+                va,
+                length,
+                max_instructions,
+                str(args.get("mode", "auto")),
+            )
+
+        registry.audit(
+            project,
+            tool,
+            registry.relative(project, path),
+            {"args": {key: value for key, value in args.items() if key != "project"}},
+        )
+
+        return {
+            "path": registry.relative(project, path),
+            **result,
+        }
+
     raise BridgeError(f"Unknown tool: {tool}")
