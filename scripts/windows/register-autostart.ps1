@@ -7,6 +7,6 @@ $launcher = Join-Path $startupDir "ChatGPT Local Bridge.cmd"
 $startScript = Join-Path $repoRoot "scripts\windows\start-background.ps1"
 @(
     "@echo off"
-    "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \`"$startScript\`""
+    "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`""
 ) | Set-Content -LiteralPath $launcher -Encoding ASCII
 Write-Host "Autostart registered: $launcher"
