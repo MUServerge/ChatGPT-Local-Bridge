@@ -1,82 +1,226 @@
 # ChatGPT Local Bridge
 
-A small read-only Windows file bridge for controlled access to large local project files.
+A read-only local research bridge that lets ChatGPT work with large project files without uploading entire repositories or binary dumps.
 
-The first use case is MU/SSEMU research: source trees, DLLs, logs, and large runtime dumps that are impractical to upload manually.
-
-## Security model
-
-- Read-only by design.
-- One explicit allowlisted root folder.
-- Bearer-token authentication.
-- Paths are resolved and checked against the allowlisted root.
-- Symlink/junction escapes are rejected by resolved-path containment checks.
-- Binary reads are range-limited.
-- No shell, command execution, write, rename, or delete endpoints.
-- Every successful data access is written to an audit log.
-
-## MVP API
-
-- `GET /health`
-- `GET /v1/list?path=.`
-- `GET /v1/stat?path=...`
-- `GET /v1/search?path=.&pattern=*.cpp&limit=200`
-- `GET /v1/read-range?path=...&offset=0&length=65536`
-- `GET /v1/hash?path=...`
-
-`read-range` returns base64 so binary files can be read safely in chunks.
-
-## Windows setup
-
-Requirements: Python 3.11+.
-
-```powershell
-git clone https://github.com/MUServerge/ChatGPT-Local-Bridge.git
-cd ChatGPT-Local-Bridge
-
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-Copy-Item .env.example .env
-```
-
-Edit `.env` and set:
-
-```env
-BRIDGE_ROOT=C:\path\to\your\project
-BRIDGE_TOKEN=replace-with-a-long-random-token
-```
-
-Then start:
-
-```powershell
-python -m uvicorn bridge.app:app --host 127.0.0.1 --port 8765
-```
-
-Test locally:
-
-```powershell
-$token = "replace-with-a-long-random-token"
-Invoke-RestMethod http://127.0.0.1:8765/health
-
-Invoke-RestMethod `
-  -Headers @{ Authorization = "Bearer $token" } `
-  "http://127.0.0.1:8765/v1/list?path=."
-```
-
-## Large binary example
-
-Read 64 KiB starting at offset `0x145180` from a runtime dump:
+The first target is:
 
 ```text
-GET /v1/read-range?path=main-runtime-image.bin&offset=1331584&length=65536
+Machine: home-ssemu
+Project: ssemu
+Root: C:\Users\hatim\Desktop\SSEMU-2.5.9
 ```
 
-The bridge does not need to transfer the whole dump for address research.
+## Architecture
 
-## Internet/ChatGPT connectivity
+```text
+ChatGPT
+   |
+   | MCP Streamable HTTP / HTTPS
+   v
+Self-hosted Relay
+   |
+   | authenticated request routing
+   | persistent outbound WebSocket
+   v
+Windows Local Agent
+   |
+   v
+Allowlisted read-only project roots
+```
 
-The MVP intentionally binds to localhost only. Do not expose port 8765 directly to the internet.
+The Windows machine does not expose an inbound public port. The agent connects outward to the relay.
 
-The next layer will add an authenticated HTTPS transport/relay or connector integration after the local agent is verified.
+## Current read-only tools
+
+General:
+
+- `machines`
+- `health`
+- `list_files`
+- `stat`
+- `search_files`
+- `search_text`
+- `read_text`
+- `read_range`
+- `hash_file`
+
+Binary / MU client research:
+
+- `pe_info`
+- `pe_sections`
+- `va_to_offset`
+- `read_va`
+- `find_bytes`
+- `strings`
+- `disassemble`
+
+No write/edit/delete/shell/process tools exist in this version.
+
+## 1. Update the Windows checkout
+
+From the bridge repository:
+
+```powershell
+git fetch origin
+git switch feature/self-hosted-mcp-relay
+git pull
+setup-local.bat
+```
+
+Edit `.env`:
+
+```env
+BRIDGE_MACHINE_ID=home-ssemu
+BRIDGE_PROJECT_ID=ssemu
+BRIDGE_ROOT=C:\Users\hatim\Desktop\SSEMU-2.5.9
+
+BRIDGE_TOKEN=LOCAL_RANDOM_SECRET
+BRIDGE_MAX_READ_BYTES=4194304
+BRIDGE_MAX_TEXT_BYTES=1048576
+BRIDGE_AUDIT_LOG=bridge-audit.log
+
+RELAY_WS_URL=wss://bridge.example.com/agent/ws
+RELAY_AGENT_TOKEN=AGENT_RANDOM_SECRET
+```
+
+Generate secrets with:
+
+```powershell
+py -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Use separate values for the local token, agent token, and MCP token.
+
+The local debug API still works:
+
+```text
+run-local.bat
+http://127.0.0.1:8765/health
+```
+
+The outbound relay agent is:
+
+```text
+run-agent.bat
+```
+
+## 2. Deploy the relay
+
+A small VPS with Docker and a DNS name is enough.
+
+Copy this repository to the server and create `.env.relay`:
+
+```env
+RELAY_AGENT_TOKEN=AGENT_RANDOM_SECRET
+RELAY_MCP_TOKEN=MCP_RANDOM_SECRET
+RELAY_REQUEST_TIMEOUT=30
+```
+
+Set the public domain before starting Compose:
+
+```bash
+export BRIDGE_DOMAIN=bridge.example.com
+docker compose up -d --build
+```
+
+Caddy terminates HTTPS automatically. DNS for `bridge.example.com` must point to the relay server.
+
+Health check:
+
+```text
+https://bridge.example.com/healthz
+```
+
+The ChatGPT-facing MCP endpoint is:
+
+```text
+https://bridge.example.com/mcp
+```
+
+Authenticate MCP requests with:
+
+```text
+Authorization: Bearer <RELAY_MCP_TOKEN>
+```
+
+## 3. Connect ChatGPT
+
+Create a developer/custom MCP connection pointing to:
+
+```text
+https://bridge.example.com/mcp
+```
+
+Use bearer authentication with the `RELAY_MCP_TOKEN`.
+
+After the Windows agent is running, the first call should be:
+
+```text
+machines()
+```
+
+Expected shape:
+
+```json
+{
+  "machines": [
+    {
+      "machine": "home-ssemu",
+      "projects": ["ssemu"]
+    }
+  ]
+}
+```
+
+Then a 152 MB runtime dump can be researched without uploading it:
+
+```text
+pe_info(machine="home-ssemu", project="ssemu", path="main-runtime-image.bin")
+
+disassemble(
+  machine="home-ssemu",
+  project="ssemu",
+  path="main-runtime-image.bin",
+  va="0x00545180",
+  length=512,
+  max_instructions=80,
+  mode="memory"
+)
+```
+
+Only the requested analysis crosses the relay.
+
+## Multi-project support
+
+For several roots on one PC, replace `BRIDGE_PROJECT_ID/BRIDGE_ROOT` with:
+
+```env
+BRIDGE_PROJECTS_JSON={"ssemu":"C:\\Users\\hatim\\Desktop\\SSEMU-2.5.9","arkania":"D:\\Projects\\ArkaniaWeb"}
+```
+
+Every request still names one project and remains constrained to that root.
+
+## Security
+
+Read [docs/SECURITY.md](docs/SECURITY.md) before exposing the relay publicly.
+
+The main rules are:
+
+- use narrow project roots;
+- run the agent as a non-admin Windows user;
+- keep agent and MCP secrets different;
+- never publish the local debug API;
+- keep the current bridge read-only while the research workflow is being validated.
+
+## Development
+
+```powershell
+pip install -r requirements.txt
+pytest -q
+```
+
+Architecture and protocol details:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/PROTOCOL.md](docs/PROTOCOL.md)
+- [docs/SECURITY.md](docs/SECURITY.md)
