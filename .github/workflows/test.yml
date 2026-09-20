@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}
+      BRIDGE_PROJECT_ID: test
+      BRIDGE_ROOT: ${{ github.workspace }}
+      BRIDGE_TOKEN: test-local-secret
 
     steps:
       - uses: actions/checkout@v4
@@ -22,5 +25,5 @@ jobs:
 
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
-      - run: python -m compileall bridge relay
+      - run: python -m compileall bridge
       - run: python -m pytest -q
