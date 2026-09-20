@@ -37,7 +37,7 @@ Every user-supplied tool path must be relative to the selected project root. The
 
 This protects against normal `..` traversal and existing symlink/junction escapes. This project is still not an operating-system sandbox, so it should run as a normal non-admin Windows user.
 
-Do not allowlist `C:\\`, `C:\Users`, or the entire Desktop.
+Do not allowlist `C:\`, `C:\Users`, or the entire Desktop.
 
 ## Tunnel boundary
 
