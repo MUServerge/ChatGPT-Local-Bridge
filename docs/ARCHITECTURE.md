@@ -1,12 +1,53 @@
 # Architecture
 
-ChatGPT connects to a self-hosted MCP relay over HTTPS. A Windows agent keeps an outbound authenticated connection to the relay and exposes only explicitly configured read-only project roots.
+## Final transport
 
-The local machine does not accept inbound internet connections. The relay routes bounded read-only requests and does not persist project file contents.
+```text
+ChatGPT
+  |
+  | OpenAI Secure MCP Tunnel
+  v
+tunnel-client (outbound HTTPS only)
+  |
+  | loopback MCP HTTP
+  v
+127.0.0.1:8765/mcp
+ChatGPT Local Bridge
+  |
+  v
+Explicit allowlisted project roots
+```
+
+There is no public relay, VPS, domain, reverse proxy, or inbound firewall rule.
+
+The local MCP server binds only to `127.0.0.1`. OpenAI's `tunnel-client` runs on the same Windows machine and forwards tunnel traffic to the loopback MCP endpoint.
+
+## Project boundary
+
+Each exposed project has a short project ID and one canonical root.
 
 Initial project:
-- machine: home-ssemu
-- project: ssemu
-- root: C:\Users\hatim\Desktop\SSEMU-2.5.9
 
-The first tool surface is read-only: project listing, file metadata/search, bounded text/range reads, hashing, PE metadata, VA mapping, byte-pattern lookup, strings, and bounded x86 disassembly.
+- project: `ssemu`
+- root: `C:\Users\hatim\Desktop\SSEMU-2.5.9`
+
+All tool paths are relative to the selected root. Absolute paths and canonical path escapes are rejected.
+
+## Read-only policy
+
+The bridge intentionally exposes no shell, process, browser, desktop, write, patch, rename, delete, or Git mutation tools.
+
+The current tool surface is for source/binary research only.
+
+## Binary research
+
+Large binaries remain local. PE analysis and x86 disassembly execute on the Windows machine and only bounded results are returned through MCP.
+
+Supported analysis includes:
+
+- PE headers and section map
+- virtual-address mapping
+- bounded reads by VA
+- wildcard byte signatures
+- printable strings
+- bounded x86 disassembly
