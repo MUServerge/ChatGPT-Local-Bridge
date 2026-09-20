@@ -1,7 +1,15 @@
 $ErrorActionPreference = "Stop"
 
-if (-not (Get-Command tunnel-client -ErrorAction SilentlyContinue)) {
-    throw "tunnel-client was not found on PATH. Install the latest official OpenAI tunnel-client release first."
+$LocalTunnel = Join-Path $env:LOCALAPPDATA "ChatGPT-Local-Bridge\tunnel-client\tunnel-client.exe"
+
+if (Test-Path $LocalTunnel) {
+    $TunnelClient = $LocalTunnel
+}
+elseif (Get-Command tunnel-client -ErrorAction SilentlyContinue) {
+    $TunnelClient = (Get-Command tunnel-client).Source
+}
+else {
+    throw "tunnel-client was not found. Run scripts\windows\install-tunnel.ps1 first."
 }
 
 $TunnelId = Read-Host "Tunnel ID (tunnel_...)"
@@ -46,9 +54,9 @@ $Principal = "$env:USERDOMAIN\$env:USERNAME"
 
 $env:CONTROL_PLANE_API_KEY = $ApiKey
 
-tunnel-client init --force --sample sample_mcp_remote_no_auth --profile $Profile --tunnel-id $TunnelId --health-listen-addr "127.0.0.1:8766" --mcp-server-url "http://127.0.0.1:8765/mcp"
+& $TunnelClient init --force --sample sample_mcp_remote_no_auth --profile $Profile --tunnel-id $TunnelId --health-listen-addr "127.0.0.1:8766" --mcp-server-url "http://127.0.0.1:8765/mcp"
 
-tunnel-client doctor --profile $Profile --explain
+& $TunnelClient doctor --profile $Profile --explain
 
 $env:CONTROL_PLANE_API_KEY = $null
 $ApiKey = $null
