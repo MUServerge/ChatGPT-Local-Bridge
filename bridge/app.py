@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 
-from .core import BridgeError, RootRegistry, execute
+from .core import BridgeError, execute
+from .mcp_server import mcp, registry
 
 load_dotenv()
 
@@ -13,14 +15,6 @@ TOKEN = os.getenv("BRIDGE_TOKEN", "").strip()
 
 if not TOKEN or TOKEN == "change-me-local":
     raise RuntimeError("BRIDGE_TOKEN must be set to a non-default value")
-
-registry = RootRegistry.from_env()
-
-app = FastAPI(
-    title="ChatGPT Local Bridge - Local Debug API",
-    version="0.2.0",
-    redoc_url=None,
-)
 
 
 def require_token(authorization: str | None = Header(default=None)) -> None:
@@ -35,12 +29,37 @@ def call(tool: str, args: dict) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with AsyncExitStack() as stack:
+        await stack.enter_async_context(mcp.session_manager.run())
+        yield
+
+
+app = FastAPI(
+    title="ChatGPT Local Bridge",
+    version="0.3.0",
+    redoc_url=None,
+    lifespan=lifespan,
+)
+
+
 @app.get("/health")
 def health() -> dict:
     return {
         "ok": True,
-        "version": "0.2.0",
+        "version": "0.3.0",
         "projects": registry.project_names(),
+        "mcp_path": "/mcp",
+    }
+
+
+@app.get("/readyz")
+def readyz() -> dict:
+    return {
+        "ready": True,
+        "projects": registry.project_names(),
+        "mcp_path": "/mcp",
     }
 
 
@@ -133,3 +152,6 @@ def read_range(
 @app.get("/v1/hash", dependencies=[Depends(require_token)])
 def hash_file(project: str, path: str) -> dict:
     return call("hash", {"project": project, "path": path})
+
+
+app.mount("/mcp", mcp.streamable_http_app())
