@@ -2,30 +2,34 @@
 
 ## Protected assets
 
-- source code and configuration below local project roots
+- local source code
 - runtime dumps and binaries
-- the rest of the workstation filesystem
-- relay credentials
+- filesystem outside the configured project roots
+- the local debug token
+- the OpenAI tunnel runtime credential
 
 ## Controls
 
-- explicit project-root allowlist
-- canonical path resolution after joins
+- bridge binds to loopback only
+- no public relay or inbound firewall rule
+- explicit allowlisted project roots
+- canonical path containment
 - absolute paths rejected
-- path escapes rejected
-- read-only tool surface
+- read-only MCP tool surface
 - bounded text and binary reads
-- no shell/process/browser/desktop tools
-- no write, patch, rename, delete, or Git mutation tools
-- local audit log for successful reads
-- separate agent and MCP bearer credentials
-- outbound-only agent transport
-- TLS termination through Caddy in production
+- no shell or process execution
+- no write/edit/delete/rename tools
+- no Git mutation tools
+- local audit log for file access
 
-## Important limitation
+## Tunnel boundary
 
-This bridge is not an operating-system sandbox. Run the local agent as a normal non-admin Windows user and allowlist only the specific project directories that ChatGPT should be able to read.
+The OpenAI Secure MCP Tunnel is transport only. `tunnel-client` reaches the local MCP server over localhost and reaches OpenAI over outbound HTTPS.
 
-Never use `C:\`, `C:\Users`, the whole Desktop, or another broad parent folder as a project root.
+The tunnel runtime API key is not stored in this repository. Keep it in the environment or the tunnel-client credential mechanism.
 
-Rotate both relay secrets if they may have leaked.
+## Operating-system boundary
+
+This project is not an OS sandbox. Run it as a normal non-admin Windows user and allowlist only specific project directories.
+
+Do not configure `C:\`, `C:\Users`, or the whole Desktop as a project root.
