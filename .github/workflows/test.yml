@@ -15,6 +15,9 @@ jobs:
       BRIDGE_PROJECT_ID: test
       BRIDGE_ROOT: ${{ github.workspace }}
       BRIDGE_TOKEN: test-local-secret
+      BRIDGE_ALLOW_WRITE: "true"
+      BRIDGE_ALLOW_DELETE: "false"
+      BRIDGE_ALLOW_COMMAND: "false"
 
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +28,8 @@ jobs:
 
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
-      - run: python -m compileall bridge
+      - run: python -m compileall bridge tests
+
       - name: Parse PowerShell
         shell: pwsh
         run: |
@@ -39,4 +43,58 @@ jobs:
               exit 1
             }
           }
+
       - run: python -m pytest -q
+
+
+  windows-smoke:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: One-click bootstrap and local write smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $project = Join-Path $env:USERPROFILE "Desktop\MU-RND-5.2"
+          New-Item -ItemType Directory -Force -Path $project | Out-Null
+
+          & .\scripts\windows\bootstrap.ps1 -SkipTunnelInstall
+
+          $health = Invoke-RestMethod "http://127.0.0.1:8765/health" -TimeoutSec 5
+          if (-not $health.ok) { throw "Bridge health check failed." }
+          if (-not $health.capabilities.write) { throw "Write capability is unexpectedly disabled." }
+          if ($health.capabilities.delete) { throw "Delete capability must be disabled by default." }
+          if ($health.capabilities.command) { throw "Command capability must be disabled by default." }
+
+          $tokenLine = Get-Content .env | Where-Object { $_ -like "BRIDGE_TOKEN=*" } | Select-Object -First 1
+          $token = $tokenLine.Substring("BRIDGE_TOKEN=".Length)
+          $headers = @{ Authorization = "Bearer $token" }
+          $body = @{
+            tool = "write_file"
+            args = @{
+              project = "mu-rnd-5.2"
+              path = "bridge-smoke.txt"
+              content = "windows-write-ok"
+            }
+          } | ConvertTo-Json -Depth 5
+
+          $write = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8765/v1/execute" -Headers $headers -ContentType "application/json" -Body $body
+          if (-not (Test-Path (Join-Path $project "bridge-smoke.txt"))) { throw "Filesystem write smoke test failed." }
+          if ($write.size -le 0) { throw "Filesystem write returned an invalid size." }
+
+          $startupFile = Join-Path ([Environment]::GetFolderPath("Startup")) "ChatGPT Local Bridge.cmd"
+          if (-not (Test-Path $startupFile)) { throw "Autostart launcher was not registered." }
+
+      - name: Stop background bridge
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path .\scripts\windows\stop-all.ps1) {
+            & .\scripts\windows\stop-all.ps1
+          }

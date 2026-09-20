@@ -1,11 +1,9 @@
 # Architecture
 
-## Final transport
-
 ```text
 ChatGPT
   |
-  | OpenAI-hosted Secure MCP Tunnel
+  | OpenAI Secure MCP Tunnel
   v
 tunnel-client on Windows
   |
@@ -14,47 +12,57 @@ tunnel-client on Windows
 127.0.0.1:8765/mcp
 ChatGPT Local Bridge
   |
-  v
-Explicit read-only project roots
+  +--> allowlisted local project roots
+  |
+  +--> bounded filesystem operations
+  |
+  +--> read-only Git status/diff
 ```
 
-There is no self-hosted relay, domain, reverse proxy, VPS, or inbound port.
+There is no self-hosted relay, VPS, domain, reverse proxy, public port, or inbound firewall rule.
 
-The local bridge binds only to `127.0.0.1`. `tunnel-client` makes outbound HTTPS requests to OpenAI and forwards MCP requests to the local `/mcp` endpoint.
+## Default project
 
-## Local project boundary
-
-Initial project:
+The one-click Windows bootstrap configures:
 
 ```text
-project: ssemu
-root: C:\Users\hatim\Desktop\SSEMU-2.5.9
+project: mu-rnd-5.2
+root: %USERPROFILE%\Desktop\MU-RND-5.2
 ```
 
-Every tool takes a project ID. Every path is relative to its allowlisted root. Absolute paths and path escapes are rejected after canonical resolution.
+The bootstrap uses the current Windows user's profile instead of hardcoding a username.
 
-## Tool families
+## Filesystem service
 
-General read-only tools:
+Every tool receives a project ID and paths relative to that project. The registry resolves paths against the project root and rejects canonical targets outside it.
 
-- projects
-- health
-- list_files
-- stat
-- search_files
-- search_text
-- read_text
-- read_range
-- hash_file
+Read operations are bounded by configured byte/line/output limits. File writes use a temporary file in the destination directory followed by an atomic replace. Patch operations use exact-text replacement and reject ambiguous matches by default.
 
-Binary research tools:
+## Capability layers
 
-- pe_info
-- pe_sections
-- va_to_offset
-- read_va
-- find_bytes
-- strings
-- disassemble
+Always available:
 
-The large binary stays on the workstation. Only requested bounded results cross the MCP tunnel.
+- read/navigation/search/hash
+- PE/binary research helpers
+- Git status/diff
+
+Enabled by default:
+
+- create/update/patch/move/rename inside allowlisted roots
+
+Disabled by default:
+
+- delete
+- general process execution
+
+## Windows lifecycle
+
+`INSTALL AND START.cmd` is the bootstrap entry point. It installs the local environment, writes project configuration, registers a per-user Startup launcher, and starts the service in the background.
+
+Runtime state and logs live under:
+
+```text
+%APPDATA%\ChatGPT-Local-Bridge
+```
+
+The Startup launcher invokes `scripts/windows/start-background.ps1`, which is idempotent: it leaves an already-running bridge alone and starts the tunnel only when tunnel credentials exist.
