@@ -26,7 +26,7 @@
 
 The OpenAI Secure MCP Tunnel is transport only. `tunnel-client` reaches the local MCP server over localhost and reaches OpenAI over outbound HTTPS.
 
-The tunnel runtime API key is not stored in this repository. Keep it in the environment or the tunnel-client credential mechanism.
+The tunnel runtime API key is never stored in this repository. The Windows setup stores it at `%APPDATA%\\ChatGPT-Local-Bridge\\tunnel.env` and applies a user-only ACL. Do not paste that key into ChatGPT or commit the file.
 
 ## Operating-system boundary
 
