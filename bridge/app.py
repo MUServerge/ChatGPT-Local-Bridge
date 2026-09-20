@@ -54,6 +54,15 @@ def health() -> dict:
     }
 
 
+@app.get("/readyz")
+def readyz() -> dict:
+    return {
+        "ready": True,
+        "projects": registry.project_names(),
+        "mcp_path": "/mcp",
+    }
+
+
 @app.get("/v1/projects", dependencies=[Depends(require_token)])
 def projects() -> dict:
     return execute(registry, "projects", {})
