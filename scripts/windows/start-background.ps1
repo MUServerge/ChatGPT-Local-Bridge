@@ -48,7 +48,7 @@ if (Test-Path $tunnelEnv) {
         $runTunnel = Join-Path $PSScriptRoot "run-tunnel.ps1"
         $stdout = Join-Path $logDir "tunnel.out.log"
         $stderr = Join-Path $logDir "tunnel.err.log"
-        $arguments = "-NoProfile -ExecutionPolicy Bypass -File \`"$runTunnel\`""
+        $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$runTunnel`""
         $tunnel = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -WorkingDirectory $repoRoot -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
         Set-Content -LiteralPath $tunnelPidPath -Value $tunnel.Id -Encoding ASCII
     }
