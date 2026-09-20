@@ -1,18 +1,32 @@
 $ErrorActionPreference = "Stop"
 
-$health = Invoke-RestMethod "http://127.0.0.1:8765/health"
+$Bridge = Invoke-RestMethod "http://127.0.0.1:8765/readyz"
 
-if (-not $health.ok) {
-    throw "Local bridge health check failed."
+if (-not $Bridge.ready) {
+    throw "Local bridge readiness check failed."
 }
 
 Write-Host "Bridge OK"
-Write-Host ("Projects: " + ($health.projects -join ", "))
-Write-Host ("MCP path: " + $health.mcp_path)
+Write-Host ("Projects: " + ($Bridge.projects -join ", "))
+Write-Host ("MCP path: " + $Bridge.mcp_path)
 
-if (Get-Command tunnel-client -ErrorAction SilentlyContinue) {
-    Write-Host "tunnel-client found."
+$LocalTunnel = Join-Path $env:LOCALAPPDATA "ChatGPT-Local-Bridge\tunnel-client\tunnel-client.exe"
+
+if (Test-Path $LocalTunnel) {
+    Write-Host ("tunnel-client: " + $LocalTunnel)
+}
+elseif (Get-Command tunnel-client -ErrorAction SilentlyContinue) {
+    Write-Host ("tunnel-client: " + (Get-Command tunnel-client).Source)
 }
 else {
-    Write-Warning "tunnel-client is not installed or not in PATH."
+    throw "tunnel-client is not installed. Run scripts\windows\install-tunnel.ps1."
+}
+
+try {
+    $Tunnel = Invoke-RestMethod "http://127.0.0.1:8766/readyz" -TimeoutSec 3
+    Write-Host "Tunnel readiness endpoint OK"
+    $Tunnel | ConvertTo-Json -Depth 5
+}
+catch {
+    Write-Warning "Tunnel is installed but not currently ready. Start scripts\windows\start-all.ps1."
 }
