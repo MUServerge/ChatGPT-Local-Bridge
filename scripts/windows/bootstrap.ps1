@@ -17,20 +17,26 @@ if (-not (Test-Path -LiteralPath $ProjectRoot -PathType Container)) {
 }
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 
-function Find-Python {
-    $py = Get-Command py.exe -ErrorAction SilentlyContinue
-    if ($py) { return @($py.Source, "-3") }
+$pyLauncher = Get-Command py.exe -ErrorAction SilentlyContinue
+$pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
+$pythonExe = $null
+$pythonPrefix = @()
 
-    $python = Get-Command python.exe -ErrorAction SilentlyContinue
-    if ($python) { return @($python.Source) }
-
+if ($pyLauncher) {
+    $pythonExe = $pyLauncher.Source
+    $pythonPrefix = @("-3")
+}
+elseif ($pythonCommand) {
+    $pythonExe = $pythonCommand.Source
+}
+else {
     throw "Python 3.11+ was not found. Install Python once, then run this launcher again."
 }
 
-$pythonCommand = Find-Python
-$pythonExe = $pythonCommand[0]
-$pythonPrefix = @()
-if ($pythonCommand.Count -gt 1) { $pythonPrefix = $pythonCommand[1..($pythonCommand.Count - 1)] }
+& $pythonExe @pythonPrefix -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"
+if ($LASTEXITCODE -ne 0) {
+    throw "Python 3.11 or newer is required."
+}
 
 $venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path $venvPython)) {
@@ -77,7 +83,8 @@ $envLines = @(
     "BRIDGE_MAX_COMMAND_OUTPUT_BYTES=524288"
     "BRIDGE_AUDIT_LOG=$repoRoot\bridge-audit.log"
 )
-[IO.File]::WriteAllLines($envPath, $envLines, (New-Object Text.UTF8Encoding($false)))
+$utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+[System.IO.File]::WriteAllLines($envPath, $envLines, $utf8NoBom)
 
 Write-Host "Configured allowed project: $ProjectRoot"
 
@@ -103,5 +110,5 @@ Write-Host "Autostart: enabled for this Windows user"
 
 $tunnelEnv = Join-Path $env:APPDATA "ChatGPT-Local-Bridge\tunnel.env"
 if (-not (Test-Path $tunnelEnv)) {
-    Write-Warning "Secure MCP Tunnel credentials are not configured yet. This is the only step that cannot be invented automatically. Run CONNECT CHATGPT.cmd once to enter the Tunnel ID and runtime API key."
+    Write-Warning "Secure MCP Tunnel credentials are not configured yet. This is the only authorization step that cannot be invented automatically. Run CONNECT CHATGPT.cmd once to enter the Tunnel ID and runtime API key."
 }
