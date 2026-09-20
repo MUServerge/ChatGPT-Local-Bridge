@@ -60,8 +60,9 @@ There are no write/edit/delete/shell/process/Git mutation tools.
 Requirements:
 
 - Python 3.11+
-- official OpenAI `tunnel-client`
 - a Secure MCP Tunnel ID and runtime API key
+
+The official OpenAI `tunnel-client` can be installed by this repository's verified Windows installer.
 
 Update the repository:
 
@@ -115,40 +116,49 @@ Optional PowerShell smoke test:
 .\scripts\windows\smoke.ps1
 ```
 
-## Connect through Secure MCP Tunnel
+## Install and configure Secure MCP Tunnel
 
-Install the current official `tunnel-client`, then set the two runtime values in the PowerShell session:
+Install the latest official OpenAI Windows amd64 tunnel client:
 
 ```powershell
-$env:CONTROL_PLANE_API_KEY="your-runtime-api-key"
-$env:CONTROL_PLANE_TUNNEL_ID="tunnel_..."
+.\scripts\windows\install-tunnel.ps1
 ```
 
-The bridge uses the private local MCP endpoint:
+The installer resolves the latest public release from `openai/tunnel-client`, verifies the release SHA-256 digest, and installs the executable under the current user's LocalAppData.
+
+Then configure the tunnel:
+
+```powershell
+.\scripts\windows\configure-tunnel.ps1
+```
+
+The wizard asks for the `tunnel_...` ID and runtime API key, initializes the profile against:
 
 ```text
 http://127.0.0.1:8765/mcp
 ```
 
-You can run both the local bridge and tunnel together:
+and runs `tunnel-client doctor`.
+
+The runtime credential is stored outside the repository at:
+
+```text
+%APPDATA%\ChatGPT-Local-Bridge\tunnel.env
+```
+
+with a user-only ACL.
+
+Start the bridge and tunnel together:
 
 ```powershell
 .\scripts\windows\start-all.ps1
 ```
 
-Or run them separately:
-
-```text
-run-local.bat
-```
-
-and in another PowerShell:
+In another PowerShell window:
 
 ```powershell
-.\scripts\windows\run-tunnel.ps1
+.\scripts\windows\smoke.ps1
 ```
-
-The tunnel script runs the official client with the selected tunnel ID and the localhost MCP URL.
 
 ## ChatGPT connection
 
