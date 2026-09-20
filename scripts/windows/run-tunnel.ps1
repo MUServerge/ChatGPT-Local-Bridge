@@ -1,29 +1,36 @@
 $ErrorActionPreference = "Stop"
 
-if (-not (Get-Command tunnel-client -ErrorAction SilentlyContinue)) {
-    throw "tunnel-client was not found in PATH. Install the official OpenAI tunnel-client first."
+$LocalTunnel = Join-Path $env:LOCALAPPDATA "ChatGPT-Local-Bridge\tunnel-client\tunnel-client.exe"
+$RuntimeEnv = Join-Path $env:APPDATA "ChatGPT-Local-Bridge\tunnel.env"
+
+if (Test-Path $LocalTunnel) {
+    $TunnelClient = $LocalTunnel
+}
+elseif (Get-Command tunnel-client -ErrorAction SilentlyContinue) {
+    $TunnelClient = (Get-Command tunnel-client).Source
+}
+else {
+    throw "tunnel-client was not found. Run scripts\windows\install-tunnel.ps1 first."
 }
 
-if (-not $env:CONTROL_PLANE_API_KEY) {
-    throw "CONTROL_PLANE_API_KEY is not set."
+if (-not (Test-Path $RuntimeEnv)) {
+    throw "Tunnel is not configured. Run scripts\windows\configure-tunnel.ps1 first."
 }
 
-if (-not $env:CONTROL_PLANE_TUNNEL_ID) {
-    throw "CONTROL_PLANE_TUNNEL_ID is not set."
+Get-Content $RuntimeEnv | ForEach-Object {
+    if ($_ -match "^[ ]*([^#][^=]*)=(.*)$") {
+        $Name = $matches[1].Trim()
+        $Value = $matches[2]
+        [Environment]::SetEnvironmentVariable($Name, $Value, "Process")
+    }
 }
 
-$mcpUrl = "http://127.0.0.1:8765/mcp"
+if ([string]::IsNullOrWhiteSpace($env:TUNNEL_PROFILE)) {
+    throw "TUNNEL_PROFILE is missing from tunnel.env."
+}
 
 Write-Host "Starting Secure MCP Tunnel"
-Write-Host "Tunnel: $($env:CONTROL_PLANE_TUNNEL_ID)"
-Write-Host "Local MCP: $mcpUrl"
+Write-Host ("Profile: " + $env:TUNNEL_PROFILE)
+Write-Host "Local MCP: http://127.0.0.1:8765/mcp"
 
-$arguments = @(
-    "run",
-    "--control-plane.tunnel-id",
-    $env:CONTROL_PLANE_TUNNEL_ID,
-    "--mcp.server-url",
-    $mcpUrl
-)
-
-& tunnel-client @arguments
+& $TunnelClient run --profile $env:TUNNEL_PROFILE
