@@ -14,12 +14,20 @@ Get-Content $RuntimeEnv | ForEach-Object {
     }
 }
 
-if (-not (Get-Command tunnel-client -ErrorAction SilentlyContinue)) {
-    throw "tunnel-client was not found on PATH."
+$LocalTunnel = Join-Path $env:LOCALAPPDATA "ChatGPT-Local-Bridge\tunnel-client\tunnel-client.exe"
+
+if (Test-Path $LocalTunnel) {
+    $TunnelClient = $LocalTunnel
+}
+elseif (Get-Command tunnel-client -ErrorAction SilentlyContinue) {
+    $TunnelClient = (Get-Command tunnel-client).Source
+}
+else {
+    throw "tunnel-client was not found. Run scripts\windows\install-tunnel.ps1 first."
 }
 
 if ([string]::IsNullOrWhiteSpace($env:TUNNEL_PROFILE)) {
     throw "TUNNEL_PROFILE is missing from tunnel.env."
 }
 
-tunnel-client run --profile $env:TUNNEL_PROFILE
+& $TunnelClient run --profile $env:TUNNEL_PROFILE
