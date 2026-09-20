@@ -1,6 +1,6 @@
 # Architecture
 
-\`\`\`text
+```text
 ChatGPT
   |
   | OpenAI Secure MCP Tunnel
@@ -17,7 +17,7 @@ ChatGPT Local Bridge
   +--> bounded filesystem operations
   |
   +--> read-only Git status/diff
-\`\`\`
+```
 
 There is no self-hosted relay, VPS, domain, reverse proxy, public port, or inbound firewall rule.
 
@@ -25,10 +25,10 @@ There is no self-hosted relay, VPS, domain, reverse proxy, public port, or inbou
 
 The one-click Windows bootstrap configures:
 
-\`\`\`text
+```text
 project: mu-rnd-5.2
 root: %USERPROFILE%\Desktop\MU-RND-5.2
-\`\`\`
+```
 
 The bootstrap uses the current Windows user's profile instead of hardcoding a username.
 
@@ -57,12 +57,12 @@ Disabled by default:
 
 ## Windows lifecycle
 
-\`INSTALL AND START.cmd\` is the bootstrap entry point. It installs the local environment, writes project configuration, registers a per-user Startup launcher, and starts the service in the background.
+`INSTALL AND START.cmd` is the bootstrap entry point. It installs the local environment, writes project configuration, registers a per-user Startup launcher, and starts the service in the background.
 
 Runtime state and logs live under:
 
-\`\`\`text
+```text
 %APPDATA%\ChatGPT-Local-Bridge
-\`\`\`
+```
 
-The Startup launcher invokes \`scripts/windows/start-background.ps1\`, which is idempotent: it leaves an already-running bridge alone and starts the tunnel only when tunnel credentials exist.
+The Startup launcher invokes `scripts/windows/start-background.ps1`, which is idempotent: it leaves an already-running bridge alone and starts the tunnel only when tunnel credentials exist.
