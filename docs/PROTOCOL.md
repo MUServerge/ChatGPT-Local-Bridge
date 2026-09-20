@@ -1,35 +1,33 @@
-# Agent relay protocol
+# MCP transport
 
-The local Windows agent connects outbound to the relay WebSocket endpoint:
+The bridge serves MCP over Streamable HTTP at:
 
-`/agent/ws`
-
-It authenticates with:
-
-`Authorization: Bearer <RELAY_AGENT_TOKEN>`
-
-The first message advertises one machine and its read-only projects:
-
-```json
-{"type":"hello","machine_id":"home-ssemu","projects":["ssemu"],"version":"0.2.0"}
+```text
+http://127.0.0.1:8765/mcp
 ```
 
-Relay request:
+This endpoint is intentionally loopback-only and has no app-level authentication in the default tunnel setup.
 
-```json
-{"type":"request","id":"opaque-id","tool":"read_va","args":{"project":"ssemu","path":"main-runtime-image.bin","va":"0x00545180","length":512}}
+The security boundary is:
+
+1. the local listener is not reachable from the internet;
+2. `tunnel-client` authenticates to OpenAI using the runtime API key;
+3. ChatGPT reaches the MCP server through the OpenAI-hosted tunnel endpoint.
+
+The local REST debug API under `/v1/*` remains protected by `BRIDGE_TOKEN`.
+
+## Secure MCP Tunnel
+
+The Windows host runs:
+
+```text
+tunnel-client
 ```
 
-Successful response:
+against the configured `tunnel_...` ID and forwards requests to:
 
-```json
-{"type":"response","id":"opaque-id","ok":true,"result":{}}
+```text
+http://127.0.0.1:8765/mcp
 ```
 
-Error response:
-
-```json
-{"type":"response","id":"opaque-id","ok":false,"error":"bounded error"}
-```
-
-The relay keeps only connection state and in-flight requests in memory. Project files are not persisted by the relay.
+No public URL is created and no project file is uploaded unless a tool explicitly returns requested bytes/text.
