@@ -56,7 +56,8 @@ $lines = @(
     "TUNNEL_HEALTH_ADDR=127.0.0.1:8766"
     "MCP_SERVER_URL=http://127.0.0.1:8765/mcp"
 )
-[IO.File]::WriteAllLines($RuntimeEnv, $lines, (New-Object Text.UTF8Encoding($false)))
+$utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+[System.IO.File]::WriteAllLines($RuntimeEnv, $lines, $utf8NoBom)
 
 $Principal = "$env:USERDOMAIN\$env:USERNAME"
 & icacls.exe $ConfigDir /inheritance:r /grant:r "${Principal}:(OI)(CI)F" | Out-Null
