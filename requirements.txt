@@ -1,3 +1,8 @@
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
 python-dotenv==1.1.1
+websockets==15.0.1
+mcp==1.13.1
+pefile==2024.8.26
+capstone==5.0.6
+pytest==8.4.1
