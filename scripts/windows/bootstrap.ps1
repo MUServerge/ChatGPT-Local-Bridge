@@ -63,7 +63,7 @@ if ([string]::IsNullOrWhiteSpace($token)) {
     $token = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+','-').Replace('/','_')
 }
 
-@(
+$envLines = @(
     "BRIDGE_PROJECT_ID=$ProjectId"
     "BRIDGE_ROOT=$ProjectRoot"
     "BRIDGE_TOKEN=$token"
@@ -76,7 +76,8 @@ if ([string]::IsNullOrWhiteSpace($token)) {
     "BRIDGE_MAX_COMMAND_SECONDS=120"
     "BRIDGE_MAX_COMMAND_OUTPUT_BYTES=524288"
     "BRIDGE_AUDIT_LOG=$repoRoot\bridge-audit.log"
-) | Set-Content -LiteralPath $envPath -Encoding UTF8
+)
+[IO.File]::WriteAllLines($envPath, $envLines, (New-Object Text.UTF8Encoding($false)))
 
 Write-Host "Configured allowed project: $ProjectRoot"
 
