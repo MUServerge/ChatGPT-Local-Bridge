@@ -11,9 +11,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      PYTHONPATH: \${{ github.workspace }}
+      PYTHONPATH: ${{ github.workspace }}
       BRIDGE_PROJECT_ID: test
-      BRIDGE_ROOT: \${{ github.workspace }}
+      BRIDGE_ROOT: ${{ github.workspace }}
       BRIDGE_TOKEN: test-local-secret
       BRIDGE_ALLOW_WRITE: "true"
       BRIDGE_ALLOW_DELETE: "false"
