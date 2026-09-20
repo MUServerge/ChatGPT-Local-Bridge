@@ -1,38 +1,22 @@
-param(
-    [string]$LocalUrl = "http://127.0.0.1:8765",
-    [string]$RelayUrl = ""
-)
-
 $ErrorActionPreference = "Stop"
 
 Write-Host "Checking local bridge..."
-$local = Invoke-RestMethod "$LocalUrl/health"
 
-if (-not $local.ok) {
+$Bridge = Invoke-RestMethod "http://127.0.0.1:8765/health"
+
+if (-not $Bridge.ok) {
     throw "Local bridge health check failed."
 }
 
 Write-Host "Local bridge OK."
-Write-Host ("Projects: " + ($local.projects -join ", "))
+Write-Host ("Projects: " + ($Bridge.projects -join ", "))
+Write-Host ("MCP: " + $Bridge.mcp_url)
 
-if ($RelayUrl) {
-    $relayBase = $RelayUrl.TrimEnd("/")
-    Write-Host "Checking relay..."
-    $relay = Invoke-RestMethod "$relayBase/healthz"
-
-    if (-not $relay.ok) {
-        throw "Relay health check failed."
-    }
-
-    Write-Host "Relay OK."
-
-    if ($relay.machines.Count -eq 0) {
-        Write-Warning "Relay is healthy, but no local agent is connected."
-    }
-    else {
-        foreach ($machine in $relay.machines) {
-            Write-Host ("Machine: " + $machine.machine)
-            Write-Host ("Projects: " + ($machine.projects -join ", "))
-        }
-    }
+try {
+    $Tunnel = Invoke-RestMethod "http://127.0.0.1:8766/readyz" -TimeoutSec 3
+    Write-Host "Tunnel ready:"
+    $Tunnel | ConvertTo-Json -Depth 5
+}
+catch {
+    Write-Warning "Tunnel readiness endpoint is not available. Start scripts\windows\start-all.ps1 first."
 }
